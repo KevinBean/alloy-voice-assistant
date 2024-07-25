@@ -1,5 +1,5 @@
 .env
 /.venv
-chat_history.md
+*.md
 private_assistant.py
 .gitignore
