@@ -1,6 +1,8 @@
 import base64
 from threading import Lock, Thread
 import json
+import time
+import keyboard
 
 import cv2
 import openai
@@ -205,7 +207,7 @@ with_image = input("Do you want to use the image from the webcam stream as the c
 
 
 # start the webcam stream
-webcam_stream = WebcamStream().start()
+webcam_stream = WebcamStream().start() if with_image else None
 
 
 # define the models to be used by the assistant
@@ -343,9 +345,19 @@ print("I am ready to assist you. Please start speaking. Press 'q' to stop.")
 # with the camera stream running, the assistant will answer the user's questions
 
 while True:
-    cv2.imshow("webcam", webcam_stream.read())
-    if cv2.waitKey(1) in [27, ord("q")]:
+    cv2.imshow("webcam", webcam_stream.read()) if with_image else None
+    # press 'q' to stop the assistant
+    if cv2.waitKey(1) in [27, ord("q")] or keyboard.is_pressed("q"):
         break
+    # press 't' to add a prompt manually,
+    elif cv2.waitKey(1) in [ord("t")] or keyboard.is_pressed("t"):
+        # wait until the user press 'Enter' to continue
+        while True:
+            prompt = input("Enter a prompt: ")
+            if prompt:
+                assistant.answer(prompt, webcam_stream.read(encode=True)) if with_image else assistant.answer(prompt)
+                break
+        
 
 stop_listening(wait_for_stop=False)
 
