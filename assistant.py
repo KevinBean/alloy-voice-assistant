@@ -86,7 +86,11 @@ class Assistant:
             self.SYSTEM_PROMPT = SYSTEM_PROMPT
         self.with_image = with_image
         self.chain = self._create_inference_chain(model)
+        self.default_image_path = "default.jpg"
 
+    def _load_default_image(self):
+        with open(self.default_image_path, 'rb') as image_file:
+            return base64.b64encode(image_file.read())
 
     def answer(self, prompt, image):
         if not prompt:
@@ -94,8 +98,17 @@ class Assistant:
 
         print("Prompt:", prompt)
 
+        if image is not None:
+            try:
+                image_base64 = image.decode()
+            except Exception as e:
+                print(f"Error decoding image: {e}. Using default image.")
+                image_base64 = self._load_default_image().decode()
+        else:
+            image_base64 = self._load_default_image().decode()
+
         response = self.chain.invoke(
-            {"prompt": prompt, "image_base64": image.decode()},
+            {"prompt": prompt, "image_base64": image_base64},
             config={"configurable": {"session_id": "unused"}},
         ).strip()
 
@@ -151,6 +164,7 @@ class Assistant:
             input_messages_key="prompt",
             history_messages_key="chat_history",
         )
+    
     def save_history(self, file_path):
         history_data = self.chain.get_session_history("1")# Convert chat history to dictionary
         print(history_data.messages)
@@ -170,10 +184,42 @@ class Assistant:
         print(formatted_content)
 
         # Write to a Markdown file
-        with open("chat_history.md", "w") as f:
+        file_name = file_path + ".md"
+        with open(file_name, "w") as f:
             f.write(formatted_content)
 
-        print("Chat history saved to chat_history.md")
+        print(f"Chat history saved to {file_name}")
+
+        summary_file_name = file_path + "_summary.md"
+        with open(summary_file_name, "w") as f:
+            f.write(self.summarize(formatted_content))
+
+        print(f"Chat history summary saved to {summary_file_name}")
+
+    def summarize(self, text):
+        """Summarize the conversation history in the text."""
+        prompt = "Summarize the conversation history happened between you and the user. The summary should be suitable for another person to know the context and what happened. Keep as more detailed as possible."
+        response = model.invoke(prompt + "The conversation history is: '''" + text + "'''").content
+        return response
+
+    def load_history(self, file_path):
+        """Load the conversation history from the markdown file."""
+        file_name = file_path + ".md"
+        # read the markdown file
+        with open(file_name, "r") as f:
+            history_data = f.read()
+
+        # if the file is not a summary, then summarize the conversation history
+        if "summary" not in file_name.lower():
+            history_data = self.summarize(history_data)
+
+        # then this response will send to the assistant
+        new_prompt = "Please read and understand the coversation summary between you and the user, and only reply understood after reading." + history_data
+        print("Loading the conversation history...")
+        print(history_data)
+        self.answer(new_prompt, None) if self.with_image else self.answer(new_prompt)
+
+        return history_data
 
 # anothe assistant class without the image
 class AssistantWithoutImage(Assistant):
@@ -324,6 +370,16 @@ assistant_index = int(input("Enter the assistant index: ")) - 1
 # get the assistant to be used
 assistant = assistants[assistants_with_image[assistant_index]] if with_image else assistants[assistants_without_image[assistant_index]]
 
+# would you like to load the previous conversation history?
+load_history = input("Would you like to load the previous conversation history? (y/n): ").lower() == "y"
+if load_history:
+    # let user choose the filename to load the conversation history from, if filename is None, then load the default history
+    file_name = input("Enter the file name to load the conversation history from: ")
+    file_name = file_name if file_name else "chat_history"
+    assistant.load_history(file_name)
+
+
+
 def audio_callback(recognizer, audio):
     try:
         prompt = recognizer.recognize_whisper(audio, model="base", language="english")
@@ -362,4 +418,8 @@ while True:
 stop_listening(wait_for_stop=False)
 
 # save the conversation history into a markdown file
-assistant.save_history("history.md")
+assistant.save_history("chat_history")
+
+# let user to enter a name and save another copy of the conversation history into a markdown file
+file_name = input("Enter a file name to save the conversation history: ")
+assistant.save_history(f"{file_name}")
