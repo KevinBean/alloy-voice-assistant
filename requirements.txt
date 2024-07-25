@@ -7,4 +7,5 @@ python-dotenv
 pyaudio
 soundfile
 SpeechRecognition
+git config user.namekeyboard
 git+https://github.com/openai/whisper.git
