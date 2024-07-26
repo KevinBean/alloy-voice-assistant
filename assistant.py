@@ -264,6 +264,12 @@ models["gemini-1.5-flash-latest"] = { "model": ChatGoogleGenerativeAI(model="gem
 # by uncommenting the following line:
 models["gpt-4o-mini"] = { "model": ChatOpenAI(model="gpt-4o-mini"), "with_image": True }
 
+# gpt-4o model
+models["gpt-4o"] = { "model": ChatOpenAI(model="gpt-4o"), "with_image": True }
+
+# gpt-4 model
+models["gpt-4"] = { "model": ChatOpenAI(model="gpt-4"), "with_image": True }
+
 # you can use local model through ollama
 models["llama3.1"] = { "model": ChatOllama(model="llama3.1"), "with_image": False }
 
@@ -345,13 +351,26 @@ For example, you may ask:
 
 Using the user's answers, you ask them to reframe their negative thoughts with your expert advice. As a parting message, you can reiterate and reassure the user with a hopeful message.
     When there is no more to discuss and the user ask you to summarize the session, create a markdown table summarizing the conversation. It should have columns for each negative belief mentioned by the user, emotion, category of negative thinking, and reframed thought.
-    """
+    """,
+    "as an interview coach": """
+    You are an interview coach who is helping a job seeker prepare for an upcoming interview.
+    The job seeker is going to have a mock interview with you.
+    You should ask the job seeker questions that are commonly asked in interviews.
+    The job seeker will answer your questions, and you should provide feedback on their answers.
+    The feedback should be about the job seeker's responses, body language, and overall performance.
+    The job seeker will ask you questions about the interview process as well.
+    You should answer the job seeker's questions and provide additional information about the interview process.
+    You should also ask the job seeker questions about their experience and skills to help them prepare for the interview.
+    Our conversation may be interrupted because of technical issues. If that happens, please let the user continue from where we left off.
+    """,
+
 }
 # multiple assistants
 assistants = {"default_with_image": Assistant(model), 
               "default_without_image": AssistantWithoutImage(model), 
               "as a english teacher": AssistantWithoutImage(model, SYSTEM_PROMPT=prompts["as a english teacher"]),
-              "as a CBT therapist": AssistantWithoutImage(model, SYSTEM_PROMPT=prompts["as a CBT therapist"])}	
+              "as a CBT therapist": AssistantWithoutImage(model, SYSTEM_PROMPT=prompts["as a CBT therapist"]),
+              "as an interview coach": AssistantWithoutImage(model, SYSTEM_PROMPT=prompts["as an interview coach"]),}	
 
 # let user choose the assistant to be used
 print("Choose the assistant to be used:")
@@ -394,7 +413,7 @@ microphone = Microphone()
 with microphone as source:
     recognizer.adjust_for_ambient_noise(source)
 
-stop_listening = recognizer.listen_in_background(microphone, audio_callback)
+stop_listening = recognizer.listen_in_background(microphone, audio_callback, phrase_time_limit=50)
 # prompt the user to speak
 print("I am ready to assist you. Please start speaking. Press 'q' to stop.")
 
@@ -413,12 +432,16 @@ while True:
             if prompt:
                 assistant.answer(prompt, webcam_stream.read(encode=True)) if with_image else assistant.answer(prompt)
                 break
+    # press 's' to save the conversation history
+    elif cv2.waitKey(1) in [ord("s")] or keyboard.is_pressed("s"):
+        assistant.save_history("chat_history")
+        break
         
 
 stop_listening(wait_for_stop=False)
 
 # save the conversation history into a markdown file
-assistant.save_history("chat_history")
+# assistant.save_history("chat_history")
 
 # let user to enter a name and save another copy of the conversation history into a markdown file
 file_name = input("Enter a file name to save the conversation history: ")
